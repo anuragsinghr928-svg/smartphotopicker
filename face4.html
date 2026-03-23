@@ -1,0 +1,1061 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Face Match → Export</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #f0ede8; color: #1a1a18;
+  min-height: 100vh; padding: 2rem 1rem 4rem;
+}
+.container { max-width: 920px; margin: 0 auto; }
+h1 { font-size: 24px; font-weight: 600; margin-bottom: 4px; letter-spacing: -0.3px; }
+.tagline { font-size: 14px; color: #666; margin-bottom: 1.5rem; }
+
+.steps { display: grid; grid-template-columns: repeat(3,1fr); gap: 1rem; margin-bottom: 1.5rem; }
+.step-pill { display: flex; align-items: center; gap: 10px; background: #fff; border: 0.5px solid rgba(0,0,0,0.1); border-radius: 10px; padding: 10px 14px; font-size: 13px; }
+.step-pill .num { width: 22px; height: 22px; border-radius: 50%; background: #1a1a18; color: #fff; font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.step-pill .txt { color: #444; line-height: 1.4; }
+
+.card { background: #fff; border: 0.5px solid rgba(0,0,0,0.1); border-radius: 14px; padding: 1.5rem; margin-bottom: 1rem; }
+.card-title { font-size: 12px; font-weight: 600; color: #999; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 14px; }
+
+#loadingBanner { background: #e6f1fb; border: 0.5px solid #b5d4f4; border-radius: 10px; padding: 12px 16px; font-size: 13px; color: #185fa5; display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; }
+.spinner { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #b5d4f4; border-top-color: #185fa5; animation: spin 0.7s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Reference photos */
+.ref-photos-grid { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; min-height: 60px; }
+.ref-photo-card { position: relative; width: 80px; height: 80px; border-radius: 10px; overflow: hidden; border: 2px solid #3b6d11; flex-shrink: 0; }
+.ref-photo-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ref-photo-card .remove-ref { position: absolute; top: 2px; right: 2px; width: 18px; height: 18px; border-radius: 50%; background: rgba(163,45,45,0.85); color: #fff; font-size: 12px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
+.ref-photo-card .ref-label { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.6); color: #fff; font-size: 9px; text-align: center; padding: 2px 3px; }
+.ref-add-btn { width: 80px; height: 80px; border-radius: 10px; border: 2px dashed rgba(0,0,0,0.2); background: #f8f7f4; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 11px; color: #888; transition: background 0.15s; flex-shrink: 0; }
+.ref-add-btn:hover { background: #f0ede8; }
+.ref-tip { font-size: 12px; color: #666; background: #f5f3ef; border-radius: 8px; padding: 8px 12px; line-height: 1.6; }
+.ref-tip strong { font-weight: 600; color: #333; }
+.mode-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 999px; margin-left: 8px; vertical-align: middle; }
+.mode-badge.multi { background: #e6f1fb; color: #185fa5; }
+.mode-badge.single { background: #eaf3de; color: #3b6d11; }
+
+/* Bulk images source tabs */
+.source-tabs { display: flex; gap: 0; margin-bottom: 14px; border-bottom: 1.5px solid rgba(0,0,0,0.08); }
+.source-tab { padding: 7px 16px; font-size: 13px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; color: #888; margin-bottom: -1.5px; transition: color 0.12s; white-space: nowrap; }
+.source-tab:hover { color: #444; }
+.source-tab.active { color: #1a1a18; border-bottom-color: #1a1a18; }
+.source-panel { display: none; }
+.source-panel.active { display: block; }
+.folder-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.folder-label { font-size: 13px; color: #666; }
+
+/* GDrive link input */
+.gdrive-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.gdrive-input {
+  flex: 1; min-width: 220px; padding: 8px 12px; font-size: 13px;
+  border: 0.5px solid rgba(0,0,0,0.2); border-radius: 8px;
+  background: #fff; color: #1a1a18; font-family: inherit;
+  outline: none; transition: border-color 0.15s;
+}
+.gdrive-input:focus { border-color: #1a5276; box-shadow: 0 0 0 3px rgba(24,95,165,0.1); }
+.gdrive-input::placeholder { color: #bbb; }
+.gdrive-note { font-size: 11px; color: #999; margin-top: 6px; line-height: 1.6; }
+.gdrive-note strong { color: #555; font-weight: 600; }
+.gdrive-status { font-size: 12px; margin-top: 8px; line-height: 1.5; }
+
+/* Google Drive picker button */
+.btn-drive { background: #fff; color: #1a1a18; border: 1px solid #dadce0; gap: 8px; }
+.btn-drive:hover { background: #f8f9fa; }
+.drive-logo { width: 16px; height: 16px; flex-shrink: 0; }
+
+/* Source status badge */
+.source-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 999px; margin-left: 6px; }
+.source-badge.local { background: #eaf3de; color: #3b6d11; }
+.source-badge.drive { background: #e6f1fb; color: #185fa5; }
+
+/* Settings */
+.settings-row { display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; margin-top: 14px; padding-top: 14px; border-top: 0.5px solid rgba(0,0,0,0.07); }
+.setting { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.setting label { color: #555; }
+.setting input[type=range] { width: 100px; }
+.setting .val { font-weight: 500; min-width: 36px; }
+.setting select { padding: 4px 8px; font-size: 13px; border: 0.5px solid rgba(0,0,0,0.2); border-radius: 6px; background: #fff; font-family: inherit; cursor: pointer; }
+.settings-hint { font-size: 11px; color: #999; margin-top: 6px; }
+
+/* Export format picker */
+.export-picker { display: flex; gap: 12px; margin-top: 0; }
+.export-option {
+  flex: 1; border: 2px solid rgba(0,0,0,0.1); border-radius: 12px;
+  padding: 16px; cursor: pointer; transition: border-color 0.15s, background 0.15s;
+  display: flex; flex-direction: column; gap: 6px; position: relative;
+}
+.export-option:hover { background: #f8f7f4; border-color: rgba(0,0,0,0.2); }
+.export-option.selected { border-color: #1a1a18; background: #fafaf9; }
+.export-option.selected .export-radio { background: #1a1a18; border-color: #1a1a18; }
+.export-option.selected .export-radio::after { display: block; }
+.export-radio {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid rgba(0,0,0,0.25); background: #fff;
+  position: absolute; top: 14px; right: 14px;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.12s, border-color 0.12s;
+}
+.export-radio::after { content:''; display:none; width:6px; height:6px; border-radius:50%; background:#fff; }
+.export-icon { font-size: 26px; line-height: 1; }
+.export-title { font-size: 14px; font-weight: 600; }
+.export-desc { font-size: 12px; color: #777; line-height: 1.5; }
+.export-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; margin-top: 2px; }
+.badge-pdf { background: #fcebeb; color: #a32d2d; }
+.badge-zip { background: #e6f1fb; color: #185fa5; }
+
+/* PDF sub-settings */
+#pdfSettings { margin-top: 14px; padding-top: 14px; border-top: 0.5px solid rgba(0,0,0,0.07); display: flex; gap: 1rem; flex-wrap: wrap; align-items: center; }
+
+/* Buttons */
+.btn { display: inline-flex; align-items: center; gap: 7px; padding: 9px 18px; border: 0.5px solid rgba(0,0,0,0.2); border-radius: 8px; font-size: 13px; font-weight: 500; cursor: pointer; background: transparent; color: #1a1a18; transition: background 0.12s, transform 0.1s; font-family: inherit; }
+.btn:hover { background: #f0ede8; }
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: 0.38; cursor: not-allowed; }
+.btn:disabled:hover { background: transparent; transform: none; }
+.btn-primary { background: #1a1a18; color: #fff; border-color: transparent; }
+.btn-primary:hover { background: #2e2e2c; }
+.btn-primary:disabled:hover { background: #1a1a18; }
+.btn-pdf { background: #a32d2d; color: #fff; border-color: transparent; }
+.btn-pdf:hover { background: #7e1f1f; }
+.btn-zip { background: #185fa5; color: #fff; border-color: transparent; }
+.btn-zip:hover { background: #104880; }
+
+/* Stats */
+.stats-bar { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; margin-bottom: 14px; }
+.stat { background: #f5f3ef; border-radius: 8px; padding: 10px 14px; }
+.stat .n { font-size: 24px; font-weight: 600; line-height: 1; }
+.stat .l { font-size: 11px; color: #888; margin-top: 3px; }
+.stat.green .n { color: #3b6d11; }
+.stat.red   .n { color: #a32d2d; }
+.stat.blue  .n { color: #185fa5; }
+
+/* Progress */
+.progress-wrap { background: #eee; border-radius: 4px; height: 6px; overflow: hidden; margin: 10px 0 6px; }
+.progress-bar { height: 100%; background: #1a1a18; border-radius: 4px; transition: width 0.25s; width: 0%; }
+.progress-lbl { font-size: 12px; color: #888; }
+
+/* Image grid */
+.img-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 8px; max-height: 380px; overflow-y: auto; margin-top: 10px; }
+.img-thumb { position: relative; border-radius: 8px; overflow: hidden; aspect-ratio: 1; background: #eee; border: 2px solid transparent; transition: border-color 0.2s; }
+.img-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.img-thumb .thumb-status { position: absolute; bottom: 0; left: 0; right: 0; font-size: 10px; font-weight: 600; text-align: center; padding: 3px 4px; line-height: 1.2; }
+.img-thumb.matched   { border-color: #3b6d11; }
+.img-thumb.matched   .thumb-status { background: rgba(59,109,17,0.85); color: #fff; }
+.img-thumb.unmatched { border-color: #ccc; opacity: 0.5; }
+.img-thumb.unmatched .thumb-status { background: rgba(0,0,0,0.5); color: #ccc; }
+.img-thumb.processing { border-color: #185fa5; }
+.img-thumb.processing .thumb-status { background: rgba(24,95,165,0.85); color: #fff; }
+.img-thumb.error { border-color: #a32d2d; }
+.img-thumb.error .thumb-status { background: rgba(163,45,45,0.85); color: #fff; }
+.img-thumb .thumb-name { position: absolute; top: 0; left: 0; right: 0; font-size: 9px; background: rgba(0,0,0,0.55); color: #fff; padding: 2px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.img-thumb .thumb-dist { position: absolute; top: 18px; right: 3px; font-size: 9px; background: rgba(0,0,0,0.5); color: #fff; padding: 1px 4px; border-radius: 4px; }
+
+/* Log */
+.log { font-family: ui-monospace, monospace; font-size: 11px; color: #666; background: #f5f3ef; border-radius: 8px; padding: 10px 12px; max-height: 120px; overflow-y: auto; margin-top: 10px; line-height: 1.7; }
+
+/* Actions */
+.actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 1rem; }
+.status-ok  { font-size: 13px; color: #3b6d11; font-weight: 500; }
+.status-err { font-size: 13px; color: #a32d2d; }
+
+/* Download result card */
+#downloadCard { display: none; }
+#downloadCard.visible { display: block; }
+.dl-row { display: flex; gap: 12px; align-items: stretch; flex-wrap: wrap; }
+.dl-box {
+  flex: 1; min-width: 200px; border: 1.5px solid rgba(0,0,0,0.1); border-radius: 12px;
+  padding: 16px 18px; display: flex; flex-direction: column; gap: 8px;
+}
+.dl-box.pdf-box { border-color: rgba(163,45,45,0.3); background: #fff8f8; }
+.dl-box.zip-box { border-color: rgba(24,95,165,0.3); background: #f5f9ff; }
+.dl-box .dl-title { font-size: 14px; font-weight: 600; }
+.dl-box .dl-sub { font-size: 12px; color: #777; line-height: 1.5; }
+.dl-box .dl-meta { font-size: 12px; font-weight: 500; color: #555; }
+.dl-preparing { font-size: 12px; color: #888; display: flex; align-items: center; gap: 6px; }
+
+.hidden { display: none; }
+.notice { background: #faeeda; border: 0.5px solid #f0c77a; border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #633806; line-height: 1.7; margin-bottom: 1rem; }
+.notice strong { font-weight: 600; }
+
+@media (max-width: 600px) {
+  .steps { grid-template-columns: 1fr; }
+  .stats-bar { grid-template-columns: repeat(2,1fr); }
+  .export-picker { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>Face Match → Export</h1>
+<p class="tagline">Upload reference photos, scan bulk images, match faces, and download results as a PDF or ZIP of images.</p>
+
+<div class="steps">
+  <div class="step-pill"><div class="num">1</div><div class="txt">Upload reference photos (front + side)</div></div>
+  <div class="step-pill"><div class="num">2</div><div class="txt">Select folder with bulk images</div></div>
+  <div class="step-pill"><div class="num">3</div><div class="txt">Match faces → download PDF or ZIP</div></div>
+</div>
+
+<div class="notice">
+  <strong>Browser:</strong> Use <strong>Chrome or Edge</strong> desktop. Everything runs locally — no data leaves your device.
+</div>
+
+<div id="loadingBanner">
+  <div class="spinner"></div>
+  <span id="loadingMsg">Loading face recognition models…</span>
+</div>
+
+<!-- Step 1: Reference -->
+<div class="card">
+  <div class="card-title">
+    Step 1 — Reference Photos
+    <span id="modeBadge" class="mode-badge hidden"></span>
+  </div>
+  <div class="ref-photos-grid" id="refGrid">
+    <div class="ref-add-btn" id="refAddBtn">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+        <circle cx="10" cy="10" r="8.5" stroke="#888" stroke-width="1.2"/>
+        <path d="M10 6v8M6 10h8" stroke="#888" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      Add photo
+    </div>
+  </div>
+  <div class="ref-tip">
+    <strong>For side/profile photos:</strong> Upload <strong>2 reference photos</strong> — one front-facing and one side-facing. The tool compares every bulk image against all references.
+  </div>
+  <input type="file" id="refInput" accept="image/*" multiple style="display:none">
+  <div id="refStatusMsg" style="font-size:12px;margin-top:8px;color:#888;"></div>
+</div>
+
+<!-- Step 2: Bulk images + settings -->
+<div class="card">
+  <div class="card-title">Step 2 — Bulk Images &amp; Settings</div>
+
+  <!-- Source tabs -->
+  <div class="source-tabs">
+    <div class="source-tab active" onclick="switchTab('local')">💻 Local Computer</div>
+    <div class="source-tab" onclick="switchTab('drive')">
+      <svg class="drive-logo" viewBox="0 0 87.3 78" style="display:inline;vertical-align:middle;margin-right:5px;" xmlns="http://www.w3.org/2000/svg"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>
+      Google Drive
+    </div>
+  </div>
+
+  <!-- Local panel -->
+  <div class="source-panel active" id="panelLocal">
+    <div class="folder-row">
+      <button class="btn" id="pickFolderBtn">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M1 3.5A1.5 1.5 0 012.5 2h3.586l1.707 1.707A1 1 0 008.5 4H13.5A1.5 1.5 0 0115 5.5v7A1.5 1.5 0 0113.5 14h-11A1.5 1.5 0 011 12.5V3.5z" fill="currentColor"/></svg>
+        Choose Folder
+      </button>
+      <button class="btn" id="pickFilesBtn">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.2" fill="none"/><path d="M5 8h6M8 5v6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        Pick Files
+      </button>
+      <span class="folder-label" id="folderLabel">No images loaded</span>
+    </div>
+  </div>
+
+  <!-- Google Drive panel -->
+  <div class="source-panel" id="panelDrive">
+
+    <!-- Picker button -->
+    <div style="margin-bottom:14px;">
+      <button class="btn btn-drive" id="drivePickerBtn">
+        <svg style="width:16px;height:16px;flex-shrink:0;" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg"><path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0 -1.2 4.5h27.5z" fill="#00ac47"/><path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335"/><path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d"/><path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc"/><path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>
+        Open Google Drive Picker
+      </button>
+      <span style="font-size:12px;color:#888;margin-left:8px;">Sign in with Google and pick images or a folder</span>
+      <div id="pickerStatus" style="font-size:12px;color:#888;margin-top:8px;line-height:1.6;"></div>
+    </div>
+
+    <!-- Divider -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;">
+      <div style="flex:1;height:1px;background:rgba(0,0,0,0.08);"></div>
+      <span style="font-size:11px;color:#bbb;font-weight:500;">OR paste a shared folder / file link</span>
+      <div style="flex:1;height:1px;background:rgba(0,0,0,0.08);"></div>
+    </div>
+
+    <!-- Paste link -->
+    <div class="gdrive-row">
+      <input type="text" class="gdrive-input" id="driveLinkInput" placeholder="Paste Google Drive folder or file link…">
+      <button class="btn" id="driveLinkBtn">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 8l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 13h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+        Load from Link
+      </button>
+    </div>
+    <div class="gdrive-note" style="margin-top:8px;">
+      Share the folder as <strong>"Anyone with the link → Viewer"</strong> then paste the link here.
+    </div>
+    <div id="driveLinkStatus" style="font-size:12px;color:#888;margin-top:6px;"></div>
+  </div>
+
+  <input type="file" id="filesInput" accept="image/*" multiple style="display:none">
+
+  <div class="settings-row">
+    <div class="setting">
+      <label>Match sensitivity</label>
+      <input type="range" id="threshold" min="0.35" max="0.75" step="0.01" value="0.50">
+      <span class="val" id="thresholdVal">0.50</span>
+    </div>
+    <div class="setting">
+      <label>Profile boost</label>
+      <input type="range" id="profileBoost" min="0.00" max="0.20" step="0.01" value="0.07">
+      <span class="val" id="profileBoostVal">+0.07</span>
+    </div>
+  </div>
+  <div class="settings-hint">
+    <strong>Profile boost</strong> adds tolerance for side/profile detections. The distance score on each thumbnail helps you fine-tune.
+  </div>
+</div>
+
+<!-- Step 3: Export format -->
+<div class="card">
+  <div class="card-title">Step 3 — Choose Export Format</div>
+  <div class="export-picker">
+
+    <div class="export-option selected" id="optPDF" onclick="selectFormat('pdf')">
+      <div class="export-radio" id="radioPDF"></div>
+      <div class="export-icon">📄</div>
+      <div class="export-title">PDF Document</div>
+      <div class="export-desc">One matched photo per page. Single file, easy to share or print.</div>
+      <span class="export-badge badge-pdf">.pdf</span>
+    </div>
+
+    <div class="export-option" id="optZIP" onclick="selectFormat('zip')">
+      <div class="export-radio" id="radioZIP"></div>
+      <div class="export-icon">🗜️</div>
+      <div class="export-title">ZIP of Images</div>
+      <div class="export-desc">All matched photos in original quality, packed into a ZIP archive.</div>
+      <span class="export-badge badge-zip">.zip</span>
+    </div>
+
+  </div>
+
+  <!-- PDF-specific settings (shown only when PDF selected) -->
+  <div id="pdfSettings">
+    <div class="setting">
+      <label style="font-size:13px;color:#555;">Page size</label>
+      <select id="pageSize"><option value="a4">A4</option><option value="letter">Letter</option><option value="a3">A3</option></select>
+    </div>
+    <div class="setting">
+      <label style="font-size:13px;color:#555;">Orientation</label>
+      <select id="orientation"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select>
+    </div>
+  </div>
+</div>
+
+<!-- Results -->
+<div class="card hidden" id="processCard">
+  <div class="card-title">Matching Results</div>
+  <div class="stats-bar">
+    <div class="stat"><div class="n" id="sTotal">0</div><div class="l">total</div></div>
+    <div class="stat green"><div class="n" id="sMatched">0</div><div class="l">matched</div></div>
+    <div class="stat red"><div class="n" id="sSkipped">0</div><div class="l">skipped</div></div>
+    <div class="stat blue"><div class="n" id="sError">0</div><div class="l">errors</div></div>
+  </div>
+  <div class="progress-wrap"><div class="progress-bar" id="progressBar"></div></div>
+  <div class="progress-lbl" id="progressLbl">—</div>
+  <div class="img-grid" id="imgGrid"></div>
+  <div class="log" id="logBox"></div>
+</div>
+
+<!-- Download card -->
+<div class="card" id="downloadCard">
+  <div class="card-title">Download</div>
+  <div class="dl-row" id="dlRow"></div>
+</div>
+
+<!-- Actions -->
+<div class="actions">
+  <button class="btn btn-primary" id="runBtn" disabled>
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3"/><path d="M6.5 5.5l4 2.5-4 2.5V5.5z" fill="currentColor"/></svg>
+    Start Face Matching
+  </button>
+  <button class="btn" id="resetBtn">Reset</button>
+  <span id="actionStatus"></span>
+</div>
+
+</div>
+
+<!-- Libraries -->
+<script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<script>
+const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+const IMG_EXTS  = ['jpg','jpeg','png','webp','bmp','gif','tiff'];
+
+let modelsLoaded = false;
+let refCards     = [];
+let bulkFiles    = [];
+let matchedFiles = [];
+let exportFormat = 'pdf'; // 'pdf' | 'zip'
+let running      = false;
+
+const $ = id => document.getElementById(id);
+
+// ── Format picker ─────────────────────────────────────────────────────────────
+function selectFormat(fmt) {
+  exportFormat = fmt;
+  $('optPDF').classList.toggle('selected', fmt === 'pdf');
+  $('optZIP').classList.toggle('selected', fmt === 'zip');
+  $('pdfSettings').style.display = fmt === 'pdf' ? 'flex' : 'none';
+}
+
+// ── Load models ───────────────────────────────────────────────────────────────
+async function loadModels() {
+  const banner = $('loadingBanner'), msg = $('loadingMsg');
+  try {
+    msg.textContent = 'Loading SSD face detector…';
+    await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
+    msg.textContent = 'Loading tiny face detector…';
+    await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+    msg.textContent = 'Loading face landmarks…';
+    await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+    msg.textContent = 'Loading face recognition…';
+    await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+    modelsLoaded = true;
+    banner.style.cssText = 'background:#eaf3de;border:0.5px solid #a0cc70;color:#3b6d11;border-radius:10px;padding:12px 16px;font-size:13px;display:flex;align-items:center;gap:10px;margin-bottom:1rem;';
+    banner.innerHTML = '<span>✓ All models ready — face recognition active</span>';
+    setTimeout(() => banner.classList.add('hidden'), 2500);
+    checkReady();
+  } catch(e) {
+    banner.style.cssText = 'background:#fcebeb;border:0.5px solid #f09595;color:#a32d2d;border-radius:10px;padding:12px 16px;font-size:13px;display:flex;align-items:center;gap:10px;margin-bottom:1rem;';
+    banner.innerHTML = '<span>Model load failed: ' + e.message + '. Check your internet and reload.</span>';
+  }
+}
+loadModels();
+
+$('threshold').addEventListener('input',    () => { $('thresholdVal').textContent    = parseFloat($('threshold').value).toFixed(2); });
+$('profileBoost').addEventListener('input', () => { $('profileBoostVal').textContent = '+' + parseFloat($('profileBoost').value).toFixed(2); });
+
+// ── Reference photos ──────────────────────────────────────────────────────────
+$('refAddBtn').addEventListener('click', () => { if (!running) $('refInput').click(); });
+$('refInput').addEventListener('change', async () => {
+  for (const f of Array.from($('refInput').files)) {
+    if (refCards.length >= 5) break;
+    await addRefPhoto(f);
+  }
+  $('refInput').value = '';
+});
+
+async function addRefPhoto(file) {
+  const sm = $('refStatusMsg');
+  sm.textContent = 'Analysing "' + file.name + '"…'; sm.style.color = '#185fa5';
+  try {
+    const img = await loadImg(file);
+    let det = await faceapi.detectSingleFace(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 })).withFaceLandmarks().withFaceDescriptor();
+    if (!det) det = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.25 })).withFaceLandmarks().withFaceDescriptor();
+    if (!det) {
+      const m = await mirrorImg(img);
+      det = await faceapi.detectSingleFace(m, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.2 })).withFaceLandmarks().withFaceDescriptor();
+    }
+    if (!det) { sm.textContent = '⚠ No face found in "' + file.name + '" — try a clearer photo.'; sm.style.color = '#a32d2d'; return; }
+    const card = { file, objUrl: URL.createObjectURL(file), descriptor: det.descriptor };
+    refCards.push(card);
+    renderRefCard(refCards.length - 1);
+    sm.textContent = '✓ Face encoded  (' + refCards.length + ' reference photo' + (refCards.length > 1 ? 's' : '') + ')';
+    sm.style.color = '#3b6d11';
+    updateBadge(); checkReady();
+  } catch(e) { sm.textContent = 'Error: ' + e.message; sm.style.color = '#a32d2d'; }
+}
+
+function renderRefCard(idx) {
+  const c = refCards[idx];
+  const div = document.createElement('div');
+  div.className = 'ref-photo-card'; div.id = 'rcard-' + idx;
+  div.innerHTML = '<img src="' + c.objUrl + '"><div class="ref-label">' + esc(c.file.name.length > 10 ? c.file.name.slice(0,9)+'…' : c.file.name) + '</div><button class="remove-ref" title="Remove">×</button>';
+  div.querySelector('.remove-ref').addEventListener('click', () => {
+    refCards.splice(idx, 1);
+    $('refGrid').querySelectorAll('.ref-photo-card').forEach(el => el.remove());
+    refCards.forEach((_,i) => renderRefCard(i));
+    updateBadge(); checkReady();
+    const sm = $('refStatusMsg'); sm.textContent = refCards.length + ' reference photo' + (refCards.length !== 1 ? 's' : '') + ' loaded.'; sm.style.color = '#666';
+  });
+  $('refGrid').insertBefore(div, $('refAddBtn'));
+}
+
+function updateBadge() {
+  const b = $('modeBadge');
+  if (refCards.length >= 2) { b.textContent = 'Multi-angle (' + refCards.length + ' refs)'; b.className = 'mode-badge multi'; b.classList.remove('hidden'); }
+  else if (refCards.length === 1) { b.textContent = 'Single reference'; b.className = 'mode-badge single'; b.classList.remove('hidden'); }
+  else { b.classList.add('hidden'); }
+}
+
+// ── Bulk images ───────────────────────────────────────────────────────────────
+// ── Tab switching ─────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.source-tab').forEach((t,i) => t.classList.toggle('active', (i===0&&tab==='local')||(i===1&&tab==='drive')));
+  $('panelLocal').classList.toggle('active', tab==='local');
+  $('panelDrive').classList.toggle('active', tab==='drive');
+}
+
+// ── Local: folder picker ──────────────────────────────────────────────────────
+$('pickFolderBtn').addEventListener('click', async () => {
+  if (!window.showDirectoryPicker) { alert('Folder picker requires Chrome or Edge.\nUse "Pick Files" instead.'); return; }
+  try {
+    const dir = await window.showDirectoryPicker();
+    bulkFiles = await scanDir(dir, dir.name + '/');
+    $('folderLabel').textContent = dir.name + '  —  ' + bulkFiles.length + ' image(s)';
+    checkReady();
+  } catch(e) { if (e.name !== 'AbortError') $('folderLabel').textContent = 'Error: ' + e.message; }
+});
+
+async function scanDir(dh, path) {
+  const r = [];
+  for await (const [name, handle] of dh.entries()) {
+    if (handle.kind === 'directory') r.push(...await scanDir(handle, path + name + '/'));
+    else if (handle.kind === 'file' && IMG_EXTS.includes(name.split('.').pop().toLowerCase()))
+      r.push({ name, path: path + name, handle, type: 'fsh' });
+  }
+  return r;
+}
+
+$('pickFilesBtn').addEventListener('click', () => { if (!running) $('filesInput').click(); });
+$('filesInput').addEventListener('change', () => {
+  bulkFiles = Array.from($('filesInput').files).map(f => ({ name: f.name, path: f.name, file: f, type: 'file' }));
+  $('folderLabel').textContent = bulkFiles.length + ' image(s) selected';
+  checkReady(); $('filesInput').value = '';
+});
+
+// ── Google Drive ──────────────────────────────────────────────────────────────
+// ▼▼▼ PASTE YOUR CREDENTIALS HERE — these are never shown to the user ▼▼▼
+const DRIVE_CLIENT_ID = 'PASTE_YOUR_CLIENT_ID_HERE';   // e.g. 1234567890-abc.apps.googleusercontent.com
+const DRIVE_API_KEY   = 'PASTE_YOUR_API_KEY_HERE';     // e.g. AIzaSyXXXXXXXXXXXXXXXXXXXX
+// ▲▲▲ ─────────────────────────────────────────────────────────────────── ▲▲▲
+
+let gapiToken = null;
+
+function getClientId()  { return DRIVE_CLIENT_ID; }
+function getApiKey()    { return DRIVE_API_KEY; }
+
+function loadGapi() {
+  return new Promise(res => {
+    if (window.gapi) { res(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://apis.google.com/js/api.js';
+    s.onload = () => gapi.load('client:picker', () => res());
+    document.head.appendChild(s);
+  });
+}
+function loadGIS() {
+  return new Promise(res => {
+    if (window.google && window.google.accounts) { res(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://accounts.google.com/gsi/client';
+    s.onload = res;
+    document.head.appendChild(s);
+  });
+}
+
+$('drivePickerBtn').addEventListener('click', async () => {
+  const status   = $('pickerStatus');
+  const clientId = getClientId();
+  const apiKey   = getApiKey();
+
+  if (!clientId) {
+    status.style.color = '#a32d2d';
+    status.textContent = '⚠ Google Drive is not configured. Please contact the developer.';
+    return;
+  }
+  if (!apiKey) {
+    status.style.color = '#a32d2d';
+    status.textContent = '⚠ Google Drive is not configured. Please contact the developer.';
+    return;
+  }
+
+  status.style.color = '#185fa5';
+  status.textContent = 'Connecting to Google…';
+
+  try {
+    await Promise.all([loadGapi(), loadGIS()]);
+
+    // Get fresh OAuth token
+    gapiToken = await new Promise((res, rej) => {
+      const client = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: 'https://www.googleapis.com/auth/drive.readonly',
+        callback: (resp) => {
+          if (resp.error) rej(new Error(resp.error_description || resp.error));
+          else res(resp.access_token);
+        }
+      });
+      client.requestAccessToken({ prompt: '' });
+    });
+
+    status.textContent = 'Opening Drive Picker…';
+
+    // Build picker with API key so it can render
+    const picker = new google.picker.PickerBuilder()
+      .setAppId(clientId.split('-')[0])
+      .setOAuthToken(gapiToken)
+      .setDeveloperKey(apiKey)
+      .addView(
+        new google.picker.DocsView(google.picker.ViewId.DOCS_IMAGES)
+          .setIncludeFolders(true)
+          .setSelectFolderEnabled(true)
+      )
+      .addView(new google.picker.DocsView(google.picker.ViewId.FOLDERS))
+      .setCallback(async (data) => {
+        if (data.action !== google.picker.Action.PICKED) return;
+        const items = data.docs;
+        status.style.color = '#185fa5';
+        status.textContent = 'Loading ' + items.length + ' item(s)…';
+        try {
+          bulkFiles = await fetchPickedItems(items);
+          status.style.color = '#3b6d11';
+          status.textContent = '✓ ' + bulkFiles.length + ' image(s) loaded from Google Drive';
+          checkReady();
+        } catch(e) {
+          status.style.color = '#a32d2d';
+          status.textContent = 'Fetch error: ' + e.message;
+        }
+      })
+      .build();
+    picker.setVisible(true);
+
+  } catch(e) {
+    status.style.color = '#a32d2d';
+    status.textContent = 'Error: ' + (e.message || JSON.stringify(e));
+  }
+});
+
+// Fetch items selected in Picker (uses OAuth Bearer token — works for private files too)
+async function fetchPickedItems(items) {
+  const files = [];
+  for (const item of items) {
+    if (item.mimeType === 'application/vnd.google-apps.folder') {
+      const sub = await fetchFolderWithToken(item.id);
+      files.push(...sub);
+    } else if (item.mimeType && item.mimeType.startsWith('image/')) {
+      $('pickerStatus').textContent = 'Downloading: ' + item.name;
+      const blob = await fetchFileWithToken(item.id);
+      files.push({ name: item.name, path: item.name, file: new File([blob], item.name, { type: item.mimeType }), type: 'file' });
+    }
+  }
+  return files;
+}
+
+async function fetchFolderWithToken(folderId) {
+  const files = [];
+  let pageToken = null;
+  const apiKey = getApiKey();
+  do {
+    const q = encodeURIComponent("'" + folderId + "' in parents and trashed=false");
+    let url = 'https://www.googleapis.com/drive/v3/files?q=' + q +
+      '&fields=nextPageToken,files(id,name,mimeType)&pageSize=100' +
+      (apiKey ? '&key=' + apiKey : '');
+    if (pageToken) url += '&pageToken=' + encodeURIComponent(pageToken);
+    const resp = await fetch(url, { headers: { Authorization: 'Bearer ' + gapiToken } });
+    if (!resp.ok) { const e = await resp.json().catch(()=>({})); throw new Error(e.error?.message || 'HTTP ' + resp.status); }
+    const data = await resp.json();
+    for (const f of (data.files || [])) {
+      if (!f.mimeType) continue;
+      if (f.mimeType === 'application/vnd.google-apps.folder') {
+        files.push(...await fetchFolderWithToken(f.id));
+      } else if (f.mimeType.startsWith('image/') && IMG_EXTS.includes((f.name||'').split('.').pop().toLowerCase())) {
+        $('pickerStatus').textContent = 'Downloading: ' + f.name + ' (' + (files.length+1) + ')';
+        try {
+          const blob = await fetchFileWithToken(f.id);
+          files.push({ name: f.name, path: f.name, file: new File([blob], f.name, { type: f.mimeType }), type: 'file' });
+        } catch(e) { console.warn('Skip', f.name, e.message); }
+      }
+    }
+    pageToken = data.nextPageToken || null;
+  } while (pageToken);
+  return files;
+}
+
+async function fetchFileWithToken(fileId) {
+  const url = 'https://www.googleapis.com/drive/v3/files/' + fileId + '?alt=media';
+  const resp = await fetch(url, { headers: { Authorization: 'Bearer ' + gapiToken } });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  return resp.blob();
+}
+
+// ── Paste link (uses API Key — folder must be public) ─────────────────────────
+$('driveLinkBtn').addEventListener('click', async () => {
+  const link   = $('driveLinkInput').value.trim();
+  const status = $('driveLinkStatus');
+  const apiKey = getApiKey();
+
+  if (!link) { status.style.color='#a32d2d'; status.textContent='Please paste a Google Drive link first.'; return; }
+  if (!apiKey) { status.style.color='#a32d2d'; status.textContent='⚠ Google Drive is not configured. Please contact the developer.'; return; }
+
+  const folderId = extractDriveFolderId(link);
+  const fileId   = extractDriveFileId(link);
+  if (!folderId && !fileId) { status.style.color='#a32d2d'; status.textContent='⚠ Could not parse link. Use a valid Google Drive folder or file share URL.'; return; }
+
+  status.style.color = '#185fa5';
+  status.textContent = folderId ? 'Loading folder contents…' : 'Loading image…';
+
+  try {
+    if (folderId) {
+      bulkFiles = await loadPublicFolder(folderId, apiKey, status);
+    } else {
+      const blob = await fetchPublicFile(fileId, apiKey);
+      const name = 'drive-' + fileId.slice(0,8) + '.jpg';
+      bulkFiles = [{ name, path: name, file: new File([blob], name, { type:'image/jpeg' }), type:'file' }];
+    }
+    if (!bulkFiles.length) {
+      status.style.color='#a32d2d';
+      status.textContent='No images found. Make sure the folder is shared as "Anyone with the link → Viewer".';
+    } else {
+      status.style.color='#3b6d11';
+      status.textContent='✓ ' + bulkFiles.length + ' image(s) loaded';
+      checkReady();
+    }
+  } catch(e) {
+    status.style.color='#a32d2d';
+    status.textContent='Error: ' + e.message;
+  }
+});
+
+async function loadPublicFolder(folderId, apiKey, statusEl) {
+  const files = [];
+  let pageToken = null;
+  do {
+    const q = encodeURIComponent("'" + folderId + "' in parents and trashed=false");
+    let url = 'https://www.googleapis.com/drive/v3/files?q=' + q +
+      '&fields=nextPageToken,files(id,name,mimeType)&pageSize=100&key=' + apiKey;
+    if (pageToken) url += '&pageToken=' + encodeURIComponent(pageToken);
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      const e = await resp.json().catch(()=>({}));
+      throw new Error(e.error?.message || 'HTTP ' + resp.status);
+    }
+    const data = await resp.json();
+    for (const f of (data.files||[])) {
+      const ext = (f.name||'').split('.').pop().toLowerCase();
+      if ((f.mimeType||'').startsWith('image/') && IMG_EXTS.includes(ext)) {
+        if (statusEl) statusEl.textContent = 'Downloading ' + (files.length+1) + ': ' + f.name;
+        try {
+          const blob = await fetchPublicFile(f.id, apiKey);
+          files.push({ name: f.name, path: f.name, file: new File([blob], f.name, { type: f.mimeType||'image/jpeg' }), type:'file' });
+        } catch(e) { console.warn('Skip', f.name, e.message); }
+      }
+    }
+    pageToken = data.nextPageToken || null;
+  } while (pageToken);
+  return files;
+}
+
+async function fetchPublicFile(fileId, apiKey) {
+  // Download publicly shared file using API key
+  const url = 'https://www.googleapis.com/drive/v3/files/' + fileId +
+    '?alt=media&key=' + apiKey;
+  const resp = await fetch(url);
+  if (!resp.ok) throw new Error('HTTP ' + resp.status + ' — file may not be publicly shared');
+  const blob = await resp.blob();
+  if (blob.size < 100) throw new Error('File too small or not accessible');
+  return blob;
+}
+
+function extractDriveFolderId(url) {
+  const m = url.match(/\/folders\/([a-zA-Z0-9_-]{10,})/);
+  return m ? m[1] : null;
+}
+function extractDriveFileId(url) {
+  let m = url.match(/\/file\/d\/([a-zA-Z0-9_-]{10,})/);
+  if (m) return m[1];
+  m = url.match(/[?&]id=([a-zA-Z0-9_-]{10,})/);
+  return m ? m[1] : null;
+}
+
+function checkReady() {
+  $('runBtn').disabled = !(modelsLoaded && refCards.length > 0 && bulkFiles.length > 0);
+}
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function loadImg(src) {
+  return new Promise((res, rej) => {
+    const url = (src instanceof Blob) ? URL.createObjectURL(src) : src;
+    const img = new Image();
+    img.onload  = () => { if (src instanceof Blob) URL.revokeObjectURL(url); res(img); };
+    img.onerror = rej; img.src = url;
+  });
+}
+function mirrorImg(img) {
+  return new Promise(res => {
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth || img.width; c.height = img.naturalHeight || img.height;
+    const ctx = c.getContext('2d');
+    ctx.translate(c.width, 0); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0);
+    const m = new Image(); m.onload = () => res(m); m.src = c.toDataURL();
+  });
+}
+function eucDist(a, b) { let s=0; for(let i=0;i<a.length;i++) s+=(a[i]-b[i])**2; return Math.sqrt(s); }
+function log(msg) {
+  const d = document.createElement('div');
+  d.textContent = '[' + new Date().toLocaleTimeString() + '] ' + msg;
+  $('logBox').appendChild(d); $('logBox').scrollTop = $('logBox').scrollHeight;
+}
+function setStats() {
+  $('sTotal').textContent   = bulkFiles.length;
+  $('sMatched').textContent = matchedFiles.length;
+  $('sSkipped').textContent = bulkFiles.filter(f=>f._status==='unmatched').length;
+  $('sError').textContent   = bulkFiles.filter(f=>f._status==='error').length;
+}
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;'); }
+
+function buildGrid() {
+  $('imgGrid').innerHTML = '';
+  bulkFiles.forEach((f, i) => {
+    const t = document.createElement('div');
+    t.className = 'img-thumb'; t.id = 'th-' + i;
+    t.innerHTML = '<div class="thumb-name">'+esc(f.name)+'</div><img id="ti-'+i+'" style="opacity:0.4"><div class="thumb-dist" id="td-'+i+'"></div><div class="thumb-status" id="ts-'+i+'">waiting</div>';
+    $('imgGrid').appendChild(t);
+  });
+}
+function setThumb(i, cls, label, url, dist) {
+  const th=$('th-'+i), img=$('ti-'+i), st=$('ts-'+i), dt=$('td-'+i);
+  if (!th) return;
+  th.className = 'img-thumb ' + cls; st.textContent = label;
+  if (url) { img.src=url; img.style.opacity='1'; }
+  if (dist !== undefined && dt) dt.textContent = dist.toFixed(3);
+  bulkFiles[i]._status = cls;
+}
+
+// ── 4-pass face matching ──────────────────────────────────────────────────────
+async function matchImage(img) {
+  const thr = parseFloat($('threshold').value);
+  const boost = parseFloat($('profileBoost').value);
+  async function detect(inp, opts) { return faceapi.detectAllFaces(inp, opts).withFaceLandmarks().withFaceDescriptors(); }
+
+  let dets = await detect(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.35 }));
+  if (!dets.length) dets = await detect(img, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.12 }));
+  if (!dets.length) dets = await detect(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.2 }));
+  if (!dets.length) {
+    const m = await mirrorImg(img);
+    dets = await detect(m, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.12 }));
+    if (!dets.length) dets = await detect(m, new faceapi.TinyFaceDetectorOptions({ inputSize: 512, scoreThreshold: 0.2 }));
+  }
+  if (!dets.length) return { matched: false, dist: 99, faces: 0 };
+
+  let bestDist = 99;
+  for (const det of dets) {
+    const score = det.detection ? det.detection.score : 1;
+    const effectiveThr = thr + (score < 0.55 ? boost : 0);
+    for (const rc of refCards) {
+      const d = eucDist(det.descriptor, rc.descriptor);
+      if (d < bestDist) bestDist = d;
+      if (d <= effectiveThr) return { matched: true, dist: d, faces: dets.length };
+    }
+  }
+  return { matched: false, dist: bestDist, faces: dets.length };
+}
+
+// ── Main run ──────────────────────────────────────────────────────────────────
+$('runBtn').addEventListener('click', async () => {
+  if (running) return;
+  running = true; matchedFiles = [];
+  $('downloadCard').classList.remove('visible'); $('downloadCard').style.display = 'none';
+  $('dlRow').innerHTML = '';
+  $('actionStatus').textContent = ''; $('actionStatus').className = '';
+  $('processCard').classList.remove('hidden');
+  $('runBtn').disabled = true; $('logBox').innerHTML = '';
+  $('progressBar').style.width = '0%';
+  buildGrid();
+  ['sTotal','sMatched','sSkipped','sError'].forEach(id => $(id).textContent = '0');
+  $('sTotal').textContent = bulkFiles.length;
+
+  for (let i = 0; i < bulkFiles.length; i++) {
+    const f = bulkFiles[i];
+    $('progressBar').style.width = Math.round((i / bulkFiles.length) * 100) + '%';
+    $('progressLbl').textContent = (i+1) + ' / ' + bulkFiles.length + '  —  ' + f.name;
+    const th = $('th-'+i); if (th) th.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    setThumb(i, 'processing', 'scanning…', null);
+
+    let objUrl = null;
+    try {
+      const file = f.type === 'file' ? f.file : await f.handle.getFile();
+      objUrl = URL.createObjectURL(file);
+      setThumb(i, 'processing', 'scanning…', objUrl);
+      const img = await loadImg(file);
+      const result = await matchImage(img);
+
+      if (result.faces === 0) {
+        setThumb(i, 'unmatched', 'no face', objUrl, result.dist);
+        log(f.name + ': no face detected — skipped.');
+      } else if (result.matched) {
+        setThumb(i, 'matched', '✓ matched', objUrl, result.dist);
+        log(f.name + ': ✓ matched  dist=' + result.dist.toFixed(3) + '  faces=' + result.faces);
+        const freshFile = f.type === 'file' ? f.file : await f.handle.getFile();
+        matchedFiles.push({ file: freshFile, name: f.name });
+      } else {
+        setThumb(i, 'unmatched', 'no match', objUrl, result.dist);
+        log(f.name + ': no match  best dist=' + result.dist.toFixed(3) + '  faces=' + result.faces);
+      }
+    } catch(e) {
+      setThumb(i, 'error', 'error', objUrl);
+      log(f.name + ': ERROR — ' + e.message);
+    }
+    setStats();
+    await new Promise(r => setTimeout(r, 10));
+  }
+
+  $('progressBar').style.width = '100%';
+  $('progressLbl').textContent = 'Matching complete — ' + matchedFiles.length + ' photo(s) matched.';
+
+  if (matchedFiles.length === 0) {
+    $('actionStatus').textContent = 'No matches found. Try increasing sensitivity or adding a side-profile reference.';
+    $('actionStatus').className   = 'status-err';
+  } else {
+    $('actionStatus').textContent = matchedFiles.length + ' photo(s) matched — preparing downloads…';
+    $('actionStatus').className   = 'status-ok';
+    await showDownloadCard();
+  }
+
+  running = false; $('runBtn').disabled = false;
+});
+
+// ── Download card — show both options ─────────────────────────────────────────
+async function showDownloadCard() {
+  const dlRow = $('dlRow');
+  dlRow.innerHTML = '';
+
+  // ── PDF box ──
+  const pdfBox = document.createElement('div');
+  pdfBox.className = 'dl-box pdf-box';
+  pdfBox.innerHTML =
+    '<div class="dl-title">📄 PDF Document</div>' +
+    '<div class="dl-sub">One photo per page · easy to share &amp; print</div>' +
+    '<div class="dl-meta">' + matchedFiles.length + ' page' + (matchedFiles.length > 1 ? 's' : '') + '</div>' +
+    '<div style="display:flex;gap:8px;align-items:center;margin-top:4px;flex-wrap:wrap;">' +
+      '<select id="dlPageSize" style="padding:4px 8px;font-size:12px;border:0.5px solid rgba(0,0,0,0.2);border-radius:6px;background:#fff;font-family:inherit;">' +
+        '<option value="a4">A4</option><option value="letter">Letter</option><option value="a3">A3</option>' +
+      '</select>' +
+      '<select id="dlOrientation" style="padding:4px 8px;font-size:12px;border:0.5px solid rgba(0,0,0,0.2);border-radius:6px;background:#fff;font-family:inherit;">' +
+        '<option value="portrait">Portrait</option><option value="landscape">Landscape</option>' +
+      '</select>' +
+    '</div>' +
+    '<div id="pdfPrepMsg" class="dl-preparing hidden"><div class="spinner" style="border-color:#f09595;border-top-color:#a32d2d;"></div> Building PDF…</div>' +
+    '<button class="btn btn-pdf" id="dlPdfBtn" style="margin-top:6px;">' +
+      '<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 8l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 13h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>' +
+      'Download PDF' +
+    '</button>';
+  dlRow.appendChild(pdfBox);
+
+  // ── ZIP box ──
+  const zipBox = document.createElement('div');
+  zipBox.className = 'dl-box zip-box';
+  zipBox.innerHTML =
+    '<div class="dl-title">🗜️ ZIP of Images</div>' +
+    '<div class="dl-sub">Original quality images packed into a single ZIP archive</div>' +
+    '<div class="dl-meta">' + matchedFiles.length + ' image' + (matchedFiles.length > 1 ? 's' : '') + '</div>' +
+    '<div id="zipPrepMsg" class="dl-preparing hidden"><div class="spinner" style="border-color:#b5d4f4;border-top-color:#185fa5;"></div> Packing ZIP…</div>' +
+    '<button class="btn btn-zip" id="dlZipBtn" style="margin-top:auto;padding-top:6px;">' +
+      '<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 8l3 3 3-3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 13h12" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>' +
+      'Download ZIP' +
+    '</button>';
+  dlRow.appendChild(zipBox);
+
+  $('downloadCard').style.display = 'block';
+  $('downloadCard').classList.add('visible');
+
+  // ── PDF download handler ──
+  $('dlPdfBtn').addEventListener('click', async () => {
+    const btn = $('dlPdfBtn'), msg = $('pdfPrepMsg');
+    btn.disabled = true; msg.classList.remove('hidden');
+    try {
+      const blob = await buildPDF($('dlPageSize').value, $('dlOrientation').value);
+      triggerDownload(blob, 'face-matched-photos.pdf');
+    } catch(e) { alert('PDF error: ' + e.message); }
+    btn.disabled = false; msg.classList.add('hidden');
+  });
+
+  // ── ZIP download handler ──
+  $('dlZipBtn').addEventListener('click', async () => {
+    const btn = $('dlZipBtn'), msg = $('zipPrepMsg');
+    btn.disabled = true; msg.classList.remove('hidden');
+    try {
+      const blob = await buildZIP();
+      triggerDownload(blob, 'face-matched-photos.zip');
+    } catch(e) { alert('ZIP error: ' + e.message); }
+    btn.disabled = false; msg.classList.add('hidden');
+  });
+}
+
+// ── Build PDF ─────────────────────────────────────────────────────────────────
+async function buildPDF(pageSize, orientation) {
+  pageSize    = pageSize    || $('pageSize').value    || 'a4';
+  orientation = orientation || $('orientation').value || 'portrait';
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation, unit: 'mm', format: pageSize });
+  const pgW = doc.internal.pageSize.getWidth();
+  const pgH = doc.internal.pageSize.getHeight();
+  const m = 10, maxW = pgW - m*2, maxH = pgH - m*2 - 6;
+
+  for (let i = 0; i < matchedFiles.length; i++) {
+    if (i > 0) doc.addPage();
+    const mf = matchedFiles[i];
+    const img = await loadImg(mf.file);
+    const iW = img.naturalWidth, iH = img.naturalHeight;
+    let dW = maxW, dH = (iH/iW)*dW;
+    if (dH > maxH) { dH = maxH; dW = (iW/iH)*dH; }
+    const x = m + (maxW-dW)/2, y = m + (maxH-dH)/2;
+    const cv = document.createElement('canvas');
+    cv.width = iW; cv.height = iH;
+    cv.getContext('2d').drawImage(img, 0, 0);
+    doc.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', x, y, dW, dH);
+    doc.setFontSize(8); doc.setTextColor(150);
+    doc.text(mf.name, m, pgH - 4);
+    doc.text((i+1) + ' / ' + matchedFiles.length, pgW - m, pgH - 4, { align: 'right' });
+  }
+  return doc.output('blob');
+}
+
+// ── Build ZIP ─────────────────────────────────────────────────────────────────
+async function buildZIP() {
+  const zip = new JSZip();
+  const folder = zip.folder('matched-photos');
+
+  for (const mf of matchedFiles) {
+    const arrayBuf = await mf.file.arrayBuffer();
+    // Preserve original filename, deduplicate if needed
+    folder.file(mf.name, arrayBuf);
+  }
+
+  return zip.generateAsync({ type: 'blob', compression: 'DEFLATE', compressionOptions: { level: 6 } });
+}
+
+// ── Trigger download ──────────────────────────────────────────────────────────
+function triggerDownload(blob, filename) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); document.body.removeChild(a); }, 1000);
+}
+
+// ── Reset ─────────────────────────────────────────────────────────────────────
+$('resetBtn').addEventListener('click', () => {
+  if (running) return;
+  refCards = [];
+  $('refGrid').querySelectorAll('.ref-photo-card').forEach(el => el.remove());
+  bulkFiles = []; matchedFiles = [];
+  $('folderLabel').textContent = 'No images loaded';
+  $('imgGrid').innerHTML = ''; $('logBox').innerHTML = '';
+  $('progressBar').style.width = '0%'; $('progressLbl').textContent = '—';
+  $('processCard').classList.add('hidden');
+  $('downloadCard').style.display = 'none'; $('downloadCard').classList.remove('visible');
+  $('dlRow').innerHTML = '';
+  $('actionStatus').textContent = ''; $('refStatusMsg').textContent = '';
+  $('modeBadge').classList.add('hidden'); $('runBtn').disabled = true;
+  if($('pickerStatus'))    $('pickerStatus').textContent    = '';
+  if($('driveLinkStatus')) $('driveLinkStatus').textContent = '';
+  if($('driveLinkInput'))  $('driveLinkInput').value        = '';
+  ['sTotal','sMatched','sSkipped','sError'].forEach(id => $(id).textContent = '0');
+});
+</script>
+</body>
+</html>
